@@ -3,6 +3,7 @@ import base64
 import json
 from pathlib import Path
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -95,14 +96,24 @@ class HTTPWorkflowTest(unittest.TestCase):
 class ProcessLifecycleTest(unittest.TestCase):
     def test_sigterm_releases_workspace(self):
         with tempfile.TemporaryDirectory() as root:
-            command = [sys.executable, '-m', 'audio_workbench.server', '--port', '0', '--data-dir', root]
+            with socket.socket() as reservation:
+                reservation.bind(('127.0.0.1', 0))
+                port = reservation.getsockname()[1]
+            command = [sys.executable, '-m', 'audio_workbench.server', '--port', str(port), '--data-dir', root]
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
                 deadline = time.monotonic() + 5
-                while not (Path(root) / 'jobs.sqlite3').exists() and time.monotonic() < deadline:
+                ready = False
+                while time.monotonic() < deadline:
                     if process.poll() is not None:
                         self.fail(process.communicate()[1].decode())
-                    time.sleep(.02)
+                    try:
+                        with urllib.request.urlopen(f'http://127.0.0.1:{port}/health', timeout=.2):
+                            ready = True
+                            break
+                    except (urllib.error.URLError, TimeoutError):
+                        time.sleep(.02)
+                self.assertTrue(ready, 'service never became ready')
                 # This acquires the same lock that the service holds until all queues close.
                 with self.assertRaises(RuntimeError):
                     Workbench(Path(root) / 'workbench', 1)
