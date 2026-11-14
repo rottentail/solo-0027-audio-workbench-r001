@@ -35,4 +35,5 @@ def timeline_command(folder, destination, segments):
         inputs.append(f'[v{index}][a{index}]')
     filters.append(''.join(inputs) + f'concat=n={len(segments)}:v=1:a=1[vout][aout]')
     return args + ['-filter_complex', ';'.join(filters), '-map', '[vout]', '-map', '[aout]',
-                   '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', '-f', 'mp4', '-y', str(destination)]
+                   '-r', '30', '-fps_mode', 'cfr', '-c:v', 'libx264', '-preset', 'ultrafast',
+                   '-c:a', 'aac', '-f', 'mp4', '-y', str(destination)]

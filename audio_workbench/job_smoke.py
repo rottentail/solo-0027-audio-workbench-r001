@@ -82,7 +82,7 @@ def main():
                 frames = imageio_ffmpeg.read_frames(str(timeline_path))
                 metadata = next(frames)
                 count = sum(1 for _ in frames)
-                assert metadata['size'] == (640, 360) and 26 <= count <= 28, (metadata, count)
+                assert metadata['size'] == (640, 360) and metadata['fps'] == 30 and 26 <= count <= 28, (metadata, count)
                 audio_path = Path(tmp) / 'timeline.wav'
                 subprocess.run([ffmpeg, '-loglevel', 'error', '-i', str(timeline_path), '-vn', '-c:a', 'pcm_s16le', '-y', str(audio_path)], check=True, timeout=30)
                 with wave.open(str(audio_path)) as audio:
