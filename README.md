@@ -15,13 +15,13 @@ python -m audio_workbench.server --host 127.0.0.1 --port 8765 --data-dir ./media
 
 ## 接口
 
-均为 JSON POST，`audio` 是完整 WAV 文件的 base64 编码。支持 16 位未压缩 PCM、单声道或立体声、8–48 kHz、最长 30 秒。请求体上限 8 MiB。
+均为 JSON POST，`audio` 是完整 WAV 文件的 base64 编码。支持 16 位未压缩 PCM 或 32 位浮点（IEEE float）WAV、单声道或立体声、8–48 kHz、最长 30 秒。请求体上限 8 MiB。
 
-* `/inspect`: `{"audio":"..."}`，返回采样率、声道数、帧数、时长和归一化峰值。
+* `/inspect`: `{"audio":"..."}`，返回采样率、声道数、帧数、时长、样本格式（`pcm16` 或 `float32`）和归一化峰值；浮点素材的峰值可超过 1。
 * `/clip`: `{"audio":"...","start":0.1,"end":1.2,"gain":1.0}`，时间单位为秒，区间左闭右开，返回 `audio` 和 `properties`。
 * `/mix`: `{"tracks":[{"audio":"...","offset":0,"gain":1}]}`，最多 8 轨；默认格式必须相同，偏移单位为秒，输出最长 30 秒。可附加 `"format":{"sample_rate":48000,"channels":2}`，先对每轨做线性插值升采样与单、双声道转换；目标采样率不得低于任一源采样率。
 
-增益范围为 0–4，混音结果饱和到 16 位范围。错误返回 HTTP 400 和 `{"error":"..."}`，未知路径返回 404。输出的 `audio` 可 base64 解码保存为 WAV。
+增益范围为 0–4。`/clip` 和 `/mix` 可附加 `"sample_format":"pcm16"` 或 `"float32"` 选择交付格式；缺省时按处理结果的原表示交付（任一轨道为浮点则混音结果为浮点）。浮点中间成品保留超满幅数值（峰值可大于 1），再次混音时可与反相信号精确相消；选择 `pcm16` 交付时按原有饱和语义量化到 16 位。不指定 `sample_format` 的纯 16 位调用与旧版本逐样本一致。响应的 `properties` 描述实际交付的文件，可对其重新解码、检测以相互确认格式与峰值。错误返回 HTTP 400 和 `{"error":"..."}`，未知路径返回 404。输出的 `audio` 可 base64 解码保存为 WAV。
 
 ### 持久化媒体任务
 
@@ -50,7 +50,7 @@ python3 -m audio_workbench.job_smoke
 
 工作区在数据目录下的 `workbench/`，使用 SQLite 元数据和不可变内容寻址 WAV。服务在启动任何队列之前获取工作区独占锁，第二个服务使用同一目录会失败。历史素材不自动回收。
 
-- `POST /assets`：`{"name":"旁白","audio":"base64 WAV"}`，返回素材 ID、格式、帧数和 SHA-256。`GET /assets` 只列活跃素材，`?archived=true` 包含归档项；`GET /assets/{id}/content` 读取原始 WAV。
+- `POST /assets`：`{"name":"旁白","audio":"base64 WAV"}`，素材限 16 位 PCM WAV（浮点 WAV 会被拒绝），返回素材 ID、格式、帧数和 SHA-256。`GET /assets` 只列活跃素材，`?archived=true` 包含归档项；`GET /assets/{id}/content` 读取原始 WAV。
 - `POST /assets/{id}/archive`：提交 `{}`。归档素材不再用于新的工程修订，但已有修订仍可读取和渲染它。
 - `POST /projects`：提交名称和下面的 `document`。返回第 1 次修订。
 - `POST /projects/{id}/revisions`：提交 `{"expected_revision":1,"document":{...}}`。只有预期修订仍为当前头修订时才能保存，冲突返回 409；历史修订不被覆盖。

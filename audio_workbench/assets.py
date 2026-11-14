@@ -15,6 +15,8 @@ class AssetLibrary:
         if not isinstance(wav_bytes, bytes) or len(wav_bytes) > 6 * 1024 * 1024:
             raise ValueError('asset must be WAV bytes up to 6 MiB')
         audio = waveio.decode(wav_bytes)
+        if audio.sample_format != waveio.PCM16:
+            raise ValueError('asset must be 16-bit PCM WAV')
         digest = hashlib.sha256(wav_bytes).hexdigest()
         asset_id = uuid.uuid4().hex
         path = self.catalog.root / 'blobs' / (digest + '.wav')

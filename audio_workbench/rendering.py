@@ -5,7 +5,7 @@ import hashlib
 
 from .arrangement import validate_manifest
 from .processing import saturate
-from .waveio import Audio, decode
+from .waveio import Audio, PCM16, decode
 
 
 class RenderCancelled(Exception):
@@ -33,6 +33,8 @@ def render_manifest(manifest, read_asset, cancelled=lambda: False, progress=lamb
         if hashlib.sha256(data).hexdigest() != clip['sha256']:
             raise ValueError('asset content digest does not match frozen render')
         source = decode(data)
+        if source.sample_format != PCM16:
+            raise ValueError('pcm-v1 renders require 16-bit PCM assets')
         if (source.rate != clip['source_rate'] or source.channels != clip['source_channels']
                 or clip['source_start'] + clip['source_frames'] > source.frames):
             raise ValueError('asset format or interval does not match frozen render')
